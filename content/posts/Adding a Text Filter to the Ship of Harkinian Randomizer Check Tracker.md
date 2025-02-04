@@ -91,3 +91,6 @@ And here it is in action.
 
 {{< media/video src=/videos/soh-check-tracker.webm type="video/webm" >}}
 
+Shoutout to [Jamie Klassen](https://github.com/jamieklassen) who was my pair
+through all of this.
+
