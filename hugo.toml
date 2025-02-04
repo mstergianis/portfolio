@@ -1,0 +1,58 @@
+baseURL = "https://michael.stergianis.ca/"
+defaultContentLanguage = "en"
+enableRobotsTXT = true
+languageCode = "en-us"
+theme = "gokarna"
+title = "Michael Stergianis"
+pygmentsStyle = "doom-one"
+
+
+[params]
+    avatarURL = "/images/avatar.jpg"
+    customHeadHTML = "<link rel='stylesheet' type='text/css' href='/css/video.css'>"
+
+
+[menu]
+  [[menu.main]]
+    pre = "<span data-feather='book'></span>"
+    # Display name
+    name = "Posts"
+
+    # Relative URL slug (appended to baseURL)
+    url = "/posts/"
+
+    # Lower weights are listed first in the menu (leftmost); higher weights are
+    # listed last in the menu (rightmost)
+    weight = 1
+
+  [[menu.main]]
+      pre = "<span data-feather='code'></span>"
+      name = "Projects"
+      url = "/projects/"
+      weight = 2
+
+  [[menu.main]]
+      pre = "<span data-feather='tag'></span>"
+      name = "Tags"
+      url = "/tags/"
+      weight = 3
+
+  [[menu.main]]
+    # Unique identifiers are required for menu entries without a name property,
+    # or for menu entries which re-use a name
+    identifier = "github"
+
+    # Absolute URL to external resource
+    url = "https://github.com/mstergianis"
+    weight = 4
+
+    # Surround the menu entry (or name) with HTML content, such as Feather
+    # icons: https://feathericons.com
+    pre = "<span data-feather='github'></span>"
+    post = ""
+
+[markup]
+  [markup.tableOfContents]
+    startLevel = 1
+    endLevel = 3
+    ordered = false
