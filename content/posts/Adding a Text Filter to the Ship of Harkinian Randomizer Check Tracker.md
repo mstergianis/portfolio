@@ -47,7 +47,7 @@ and all takes place in the
 `shipwright/soh/soh/Enhancements/randomizer/randomizer_check_tracker.cpp` file
 but fair warning the code has changed upstream since we contributed the feature.
 
-We started by added the UI element.
+We started by adding the UI element.
 
 ```c++
 static ImGuiTextFilter checkSearch;
