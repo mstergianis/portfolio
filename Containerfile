@@ -1,7 +1,7 @@
 FROM ghcr.io/hugomods/hugo:base AS builder
 
 WORKDIR /app
-COPY . /app
+COPY . /app/
 
 RUN hugo build --minify --ignoreCache
 

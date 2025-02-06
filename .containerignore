@@ -1,1 +1,6 @@
 public/
+.git/
+.gitignore
+.gitmodules
+.hugo_build.lock
+Makefile
