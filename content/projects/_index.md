@@ -3,7 +3,8 @@ title: "Projects"
 type: page
 ---
 
-Coming Soon!
-<!-- ## [pacdiff](./pacdiff) -->
+## [vwp](./vwp)
 
-<!-- A golang package differ. -->
+A Vaultwarden utility that downloads all of your passwords and stores them using the unix password utility `pass`.
+
+<!-- ## [pacdiff](./pacdiff) -->
