@@ -6,6 +6,8 @@ showTableOfContents: false
 tags: ["ship of harkinian", "randomizer", "c++"]
 title: "Adding a Text Filter to the Ship of Harkinian Randomizer Check Tracker"
 type: "post"
+params:
+    thumbnail: "/images/check-tracker-thumbnail.png"
 ---
 
 # Premise
