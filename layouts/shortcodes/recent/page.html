@@ -1,0 +1,18 @@
+{{ $type := (.Get "type") }}
+{{ $pages := collections.Sort (.Site.GetPage $type).Pages "Date" "desc" }}
+{{ with index $pages 0 }}
+<div class="recent-post">
+  <div>
+    <a href="{{.RelPermalink}}">
+      <h3 class="recent-post-title">{{ .LinkTitle }}</h3>
+    </a>
+    <div class="recent-post-date">{{ .Date.Format "January 02, 2006" }}</div>
+  </div>
+  <div class="recent-post-description">{{ .Description }}</div>
+  {{ if .Params.Thumbnail }}
+  <a href="{{.RelPermalink}}">
+    <img class="recent-post-thumbnail" src="{{ .Params.Thumbnail }}" />
+  </a>
+  {{ end }}
+</div>
+{{ end }}

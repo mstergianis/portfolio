@@ -1,4 +1,10 @@
-This is a super simple static site where I can put things when I want to go into
-more depth than something like a resume or a cover letter allows.
+Hey I'm Mike. I'm a father, husband, programmer, an amateur cook, a rock
+climber. On this site you'll find some things that I've worked on.
 
-<!-- Check out the [Projects](/projects) or the [Posts](/posts) for more info -->
+Check out my most recent stuff below.
+
+## [Projects](/projects)
+{{< recent/page type="/projects" >}}
+
+## [Posts](/posts)
+{{< recent/page type="/posts" >}}
