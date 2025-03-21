@@ -1,0 +1,3 @@
+{{ with $src :=  (.Get "src") }}
+{{ readFile $src | safeHTML }}
+{{ end }}
