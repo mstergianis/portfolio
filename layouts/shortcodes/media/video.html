@@ -1,6 +1,8 @@
+{{ $loop := cond (isset .Params "loop") (.Get "loop") true }}
+
 {{ $type := (.Get "type") }}
 {{ with resources.Get (.Get "src") }}
-<video class="video-fragment" autoplay loop muted controls>
+<video class="video-fragment" autoplay {{ if $loop }}{{ "loop" }}{{ end }} muted controls>
   <source src="{{ .RelPermalink }}" type="{{ $type }}">
 </video>
 {{ end }}

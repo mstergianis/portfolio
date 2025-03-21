@@ -101,7 +101,7 @@ But feel free to poke around in the code if you want to understand how the
 decoding process works at a fine level. At a high level it's basically just the
 opposite of the encoding process.
 
-The actual type definition of BitStringWriter 
+The actual type definition of BitStringWriter
 ```go
 type BitStringWriter struct {
 	buffer []byte
@@ -172,6 +172,8 @@ bs.write(0b10, 2)
 // bs.buffer = [[0101 1101] [0000 0000]]
 //                            ^ bs.offset
 ```
+
+{{< media/video src=/videos/HuffmanAnimation.mp4 type="video/mp4" loop=false >}}
 
 ## How to Encode Sub-byte elements
 
@@ -317,3 +319,139 @@ right: 0b0
 
 ## Encoding the Tree
 
+> Note: encoding the tree happens before encoding the content in the algorithm.
+
+Encoding the tree is reasonably straightforward once you understand sub-byte
+encoding. What we do is we define 3 control sequences each 2 bits wide.
+
+```go
+type ControlBit byte
+const (
+	CONTROL_BIT_FREQ_PAIR ControlBit = 0b01 // indicates you're reading a frequency pair
+	CONTROL_BIT_LEFT      ControlBit = 0b11 // indicates you're reading a left child
+	CONTROL_BIT_RIGHT     ControlBit = 0b10 // indicates you're reading a right child
+)
+```
+
+The frequency pair control sequence precedes a full byte, and a left or right
+control sequence precedes another control sequence. Putting that all together
+you get the following [grammar](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form).
+
+```
+node                       = (leftChild rightChild) | freqPair .
+leftChild         (2 bits) = leftBitString node .
+rightChild        (2 bits) = rightBitString node .
+freqPair         (10 bits) = freqPairBitstring byte .
+freqPairBitString (2 bits) = "01" .
+leftBitString     (2 bits) = "11" .
+rightBitString    (2 bits) = "10" .
+byte              (8 bits) = 8 * binaryDigit
+binaryDigit                = "1" | "0" .
+```
+
+From there the tree itself looks like a long string of nodes. This is all we
+need to encode the tree. We don't need to mention the closing of a node. Nor do
+we need to signal that the tree encoding has ended. This is because of the great
+feature of Huffman trees that a node always either has a frequency pair, or both
+a left and right child. This assumption allows us this terse encoding.
+
+Here's the entire code for encoding the tree to a bitstring writer.
+```go
+func (n *Node) WriteBytes(bs *BitStringWriter) {
+	if n == nil { return } // gofmt is pissed
+	if n.freqPair != nil {
+		bs.Write(byte(CONTROL_BIT_FREQ_PAIR), 2)
+		bs.Write(n.freqPair.char, 8)
+	}
+	if n.left != nil {
+		bs.Write(byte(CONTROL_BIT_LEFT), 2)
+		n.left.WriteBytes(bs)
+	}
+	if n.right != nil {
+		bs.Write(byte(CONTROL_BIT_RIGHT), 2)
+		n.right.WriteBytes(bs)
+	}
+	return
+}
+```
+
+## How do you Know When You're Done Reading the Content?
+
+I mentioned in the last section that we didn't need to encode that the tree was
+finished. That we would know when we were done because we had reached a leaf
+node for every initiated child. Well that same guarantee does not exist for the
+content. For example, let's say that we're ending our `hello world\n` example.
+So the last character we're encoding is the newline `\n`. And let's say for
+simplicity's sake that the newline is being written to a fresh byte, so our
+offset is currently 0. That means the final byte will look like this.
+```
+[... [0111 0000]]
+           ^
+```
+
+So, we're reading this in and the only information we've been given is the tree
+so far. How do we know if this next 0 is left, or just a 0.
+
+So you could theoretically use one of the ASCII control characters like `NUL` or
+`EOT` to indicate that the content has ended. But what if the file actually had
+one of those characters in it for some reason. Then we might prematurely exit
+our algorithm.
+
+So I settled on encoding the content length (in bytes) with a previously unused
+control sequence and a 30bit integer before the tree.
+
+The control sequence isn't strictly necessary, more than anything acts as a
+header that tells us that the file _might_ actually be one we care about
+```go
+if ControlBit(bits) != CONTROL_BIT_CONTENT_LENGTH {
+    return 0, fmt.Errorf(
+        "error: decoding expected first 2 bits to be the ControlBit header %02b",
+        bits,
+    )
+}
+```
+
+Thus the entire file looks like this
+```
+2bits control sequence for content length
+30bits content length as a uint32 (but the first 2 bits are ignored)
+The tree in as many bits as it takes
+The content in as many bits as it takes
+```
+
+# Conclusion
+
+It was a fun project, with a lot of room to solve problems while coming up with
+the encoding.
+
+Let's compare our results to the video. When I looked up the lyrics to the song
+they were clearly different than the lyrics displayed in the video. I'll talk
+about how that might create discrepancies in a moment.
+
+```
+Wild Wild West Lyrics:
+  input:  4334 bytes (34672 bits)
+  output: 2567 bytes (20536 bits)
+  ratio:  0.592293
+
+Compared to the figures given in Tom Scott's video:
+  input:  3687 bytes (29496 bits)
+  output: 2561 bytes (20488 bits)
+  ratio:  0.69460
+```
+
+As for the discrepancy, I have two guesses. Maybe the fact that my input is
+larger means that bytes with higher frequency (and therefore more efficient
+encodings) are repeated more often. Or maybe my tree encoding is more efficient
+than theirs.
+
+```shell
+$ wc -c wild-wild-west.txt wild-wild-west-encoded.huff
+4334 wild-wild-west.txt
+2567 wild-wild-west-encoded.huff
+6901 total
+
+$ sha256sum wild-wild-west.txt wild-wild-west-decoded.txt
+52c6ac38d1a79ffafeda16a74d20fb59cc9a5fc099609a59654f449c6cc95017  wild-wild-west.txt
+52c6ac38d1a79ffafeda16a74d20fb59cc9a5fc099609a59654f449c6cc95017  wild-wild-west-decoded.txt
+```
