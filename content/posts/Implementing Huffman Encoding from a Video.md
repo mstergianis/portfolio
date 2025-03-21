@@ -1,7 +1,6 @@
 ---
 date: 2025-03-20T15:14:40-04:00
 description: "my first venture into custom binary encodings"
-# image: ""
 lastmod: 2025-03-20
 showTableOfContents: true
 tags: ["huffman","bits","encoding","compression"]
@@ -9,6 +8,7 @@ title: "Implementing Huffman Encoding From a Video"
 type: "post"
 params:
   github: "https://github.com/mstergianis/huffman/"
+  thumbnail: "/images/huffman.png"
 ---
 
 # Introduction
