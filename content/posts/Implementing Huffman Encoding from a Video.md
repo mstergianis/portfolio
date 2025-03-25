@@ -1,9 +1,9 @@
 ---
 date: 2025-03-20T15:14:40-04:00
 description: "my first venture into custom binary encodings"
-lastmod: 2025-03-20
+lastmod: 2025-03-24
 showTableOfContents: true
-tags: ["huffman","bits","encoding","compression"]
+tags: ["huffman", "trees", "bits", "encoding", "compression"]
 title: "Implementing Huffman Encoding From a Video"
 type: "post"
 params:
@@ -13,18 +13,18 @@ params:
 
 # Introduction
 
-Back in 2017 I watched Tom Scott's video on Huffman encoding. And there it sat
-in my brain until a week ago when I started watching [Tsoding's video on Byte
-Pair Encoding](https://www.youtube.com/watch?v=6dCqR9p0yWY). Text compression
-and encoding schemes have intrigued me for a while so now seemed like the right
-time to take a crack at something like that.
+Back in 2017 I watched Tom Scott's video on Huffman encoding. It's an excellent
+and terse explanation of a really interesting concept. A text compression scheme
+that operates at the character (in this case byte level). There it sat in my
+brain until a week ago when I started watching [Tsoding's video on Byte Pair
+Encoding](https://www.youtube.com/watch?v=6dCqR9p0yWY). Text compression and
+encoding schemes have intrigued me for a while so now seemed like the right time
+to take a crack at something like that.
 
 {{< youtube JsTptu56GM8 >}}
 
 I decided that with only the YouTube video as guidance I would implement Huffman
 encoding.
-
-To be fair, the video does an excellent job at describing the scheme.
 
 # The Process
 
@@ -32,6 +32,8 @@ To be fair, the video does an excellent job at describing the scheme.
 > outright. But I will be copying and lightly modifying snippets from [the
 > github repo](https://github.com/mstergianis/huffman/). So if you want to see
 > how this all works you can check it out there.
+
+The process for coming up with the encoding is straightforward.
 
 Count the frequencies of all the characters
 ```go
@@ -54,7 +56,7 @@ sort.SliceStable(characters, func(i int, j int) bool {
 })
 ```
 
-Based on that sorted list you can start to create the tree. Which is done by
+Based on that sorted list we can start to create the tree. Which is done by
 taking the least frequent elements (the first two elements in the list) and
 joining them via a node, then putting that node back in the list. We do this
 until we have only one element remaining.
@@ -65,6 +67,7 @@ for len(nodes) > 1 {
         left: nodes[0],
         right: nodes[1],
     }
+    // truncate the first two elements and add our new one
     nodes = append(nodes[2:], newNode)
     sort.SliceStable(nodes, func(i, j int) bool {
         return nodes[i].Freq() < nodes[j].Freq()
@@ -77,8 +80,8 @@ return head
 ## The Need to Encode Sub-byte Elements
 
 Now the fun part, and the part that the video glossed over the most! Writing the
-encoded file to disk. You see your efforts to compress the text will be wasted
-if you naively print out your encodings.
+encoded file to disk. Our efforts to compress the text will be wasted if we
+naively print out our encodings.
 
 
 ```go
@@ -90,14 +93,14 @@ for _, b := range []byte(input) {
 }
 ```
 
-This is because most of your encodings will be less than a full byte. In fact
-that's why the `tree.Search` method returns the bitWidth.
+This is because most of our encodings will be less than a full byte. In fact
+that's why the `tree.Search` method returns the `bitWidth`.
 
 So for this we have two structures in the codebase `BitStringWriter` for
 encoding and `BitStringReader` for decoding.
 
 We'll focus on `BitStringWriter` since this blog post will only cover encoding.
-But feel free to poke around in the code if you want to understand how the
+But feel free to poke around in the code if we want to understand how the
 decoding process works at a fine level. At a high level it's basically just the
 opposite of the encoding process.
 
@@ -109,7 +112,7 @@ type BitStringWriter struct {
 }
 ```
 
-is very similar to the go standard library's bytes.Buffer
+is very similar to the go standard library's [`bytes.Buffer`](https://pkg.go.dev/bytes#Buffer)
 ```go
 type Buffer struct {
 	buf      []byte // contents are the bytes buf[off : len(buf)]
@@ -126,18 +129,21 @@ func (bs *BitStringWriter) Write(b byte, w int)
 func (b *bytes.Buffer) Write(p []byte) (n int, err error)
 ```
 
-The return types aren't all that interesting. But what is interesting are the
-arguments. Our method expects you to pass in a single `byte` and an `int`? It
+The return types aren't all that interesting (especially since bytes.Buffer
+never returns an error; it panics :joy:). But what is interesting are the
+arguments. Our method expects one to pass in a single `byte` and an `int`? It
 doesn't conform to the [`io.Writer`](https://pkg.go.dev/io#Writer) interface...
 So what good is it?
 
-Well it allows you to write less than a byte. Let's say for example that we're
-encoding the text "hello world". And the tree we've derived is as follows.
+Well it allows us to write _less than_ a byte to our internal buffer. Let's say
+for example that we're encoding the text "hello world". And the tree we've
+derived is as follows.
 
 {{< media/svg src="/static/svgs/hello-world-graph.svg" >}}
 
 When it comes time to write the first `h` we traverse the graph left, right,
-then left. Leading to the encoding 010 with a bit width of 3.
+then left. Leading to the encoding `010` with a bit width of 3. Then the `e` is
+`1110` and 4 bits. Finally the l is only 2 bits with the encoding `10`.
 
 So if we naively wrote this with a classical writer
 ```go
@@ -153,31 +159,39 @@ We would be writing 3 bytes where we could actual write 9 bits.
 This is where the `BitStringWriter` shines. When we write
 ```go
 bs.Write(0b010, 3)
-// bs.buffer = [[0100 0000]]
-//                 ^ bs.offset
 ```
 
-It really does only write 3 bytes to an internal buffer. Then when we write the
-`e`
+It really does only write 3 bytes to an internal buffer. 
+```
+bs.buffer = [[0100 0000]]
+                 ^ bs.offset
+```
+
+Then when we write the `e`
 ```go
 bs.Write(0b1110, 4)
 // bs.buffer = [[0101 1100]]
-//                      ^ bs.offset
+//                       ^ bs.offset
 ```
 
-and we still have a bit remaining that we can write to. which the
-`bitstringwriter` will gladly take care of spanning the gap when we write the `l`.
+and we still have 1 bit remaining that we can write to. which the
+`BitStringWriter` will gladly take care of spanning the gap when we write the
+`l`.
+
 ```go
 bs.write(0b10, 2)
 // bs.buffer = [[0101 1101] [0000 0000]]
 //                            ^ bs.offset
 ```
 
+Here's an animation that sums up everything we just did visually.
+
 {{< media/video src=/videos/HuffmanAnimation.mp4 type="video/mp4" loop=false >}}
 
 ## How to Encode Sub-byte elements
 
-Here it is, easy enough right?
+So how do we do this in practice? Here's the function in its entirety. But let's
+break it down a bit.
 ```go
 func (bs *BitStringWriter) Write(b byte, w int) {
 	if w < 1 {
@@ -187,7 +201,7 @@ func (bs *BitStringWriter) Write(b byte, w int) {
 		bs.addByte()
 	}
 
-	// do we have enough space for the whole "partial-byte"?
+	// do we have enough space for the whole bitstring?
 	overflow := bs.offset + w
 	if overflow > 8 {
 		// 1. write part to existing byte
@@ -210,12 +224,11 @@ func (bs *BitStringWriter) Write(b byte, w int) {
 }
 ```
 
-We can probably make it a bit clearer though. Getting straight into the core
-logic, we start by checking to see if writing this width would overflow our
-current byte.
+Skipping past the if statements at the beginning that prevent errors, we start
+by checking to see if writing this width would overflow our current byte.
 
 ```go
-// do we have enough space for the whole "partial-byte"?
+// do we have enough space for the whole bitstring?
 overflow := bs.offset + w
 if overflow > 8 {
 ```
@@ -233,7 +246,7 @@ bs.buffer[len(bs.buffer)-1] = bs.buffer[len(bs.buffer)-1] | (b << (8 - bs.offset
 bs.offset += w
 ```
 
-So we take our current buffer, which we established is empty, and or it with our value.
+So we take our current buffer and or it with our value.
 ```go
 // psuedocode
 bs.buffer[-1] = 0b0000_0000 | (b << (8 - bs.offset - w))
@@ -242,6 +255,7 @@ bs.buffer[-1] = 0b0000_0000 | (b << (8 - bs.offset - w))
 But our buffer is completely empty, so we need to shift our value to the left,
 so that it occupies the left bits of our byte. We can figure that out from our
 offset
+
 ```go
 0b010 << (8 - 0 - 3)
 ```
@@ -250,7 +264,7 @@ Why did we shift by that amount
 - `8` is the number of bits in a byte, so we move all the way to the left
   ```
   [0000 0000]
-   ^
+  ^
   ```
 - `0` is our current offset, if we had an offset, we would want to move to the right by that amount
 - `3` is the width of our character so we move back to the right by 3
@@ -264,7 +278,7 @@ Now when we do the `or` it will write to the correct location
 [0000 0000] | [0100 0000] => [0100 0000]
 ```
 
-Okay so now what if you are spanning two bytes? Let's say we've written `he` so
+Okay so now what if we're spanning two bytes? Let's say we've written `he` so
 our buffer looks like this, and our offset is currently 7 after the write of 3
 and 4 respectively.
 ```
@@ -320,6 +334,8 @@ right: 0b0
 ## Encoding the Tree
 
 > Note: encoding the tree happens before encoding the content in the algorithm.
+> Encoding the content length happens before encoding the tree. But explaining
+> it in reverse feels more intuitive to me.
 
 Encoding the tree is reasonably straightforward once you understand sub-byte
 encoding. What we do is we define 3 control sequences each 2 bits wide.
@@ -327,15 +343,18 @@ encoding. What we do is we define 3 control sequences each 2 bits wide.
 ```go
 type ControlBit byte
 const (
-	CONTROL_BIT_FREQ_PAIR ControlBit = 0b01 // indicates you're reading a frequency pair
-	CONTROL_BIT_LEFT      ControlBit = 0b11 // indicates you're reading a left child
-	CONTROL_BIT_RIGHT     ControlBit = 0b10 // indicates you're reading a right child
+	CONTROL_BIT_FREQ_PAIR ControlBit = 0b01 // indicates we're reading a frequency pair
+	CONTROL_BIT_LEFT      ControlBit = 0b11 // indicates we're reading a left child
+	CONTROL_BIT_RIGHT     ControlBit = 0b10 // indicates we're reading a right child
 )
 ```
 
-The frequency pair control sequence precedes a full byte, and a left or right
-control sequence precedes another control sequence. Putting that all together
-you get the following [grammar](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form).
+The frequency pair control sequence precedes a full byte, the ASCII
+representation of the character it encodes. It's also our only representation of
+a leaf node. The left or right control sequences are recursive, they immediately
+precede another control sequence. This outlines the tree structure. Putting that
+all together we get the following
+[grammar](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form).
 
 ```
 node                       = (leftChild rightChild) | freqPair .
@@ -362,6 +381,7 @@ func (n *Node) WriteBytes(bs *BitStringWriter) {
 	if n.freqPair != nil {
 		bs.Write(byte(CONTROL_BIT_FREQ_PAIR), 2)
 		bs.Write(n.freqPair.char, 8)
+        return
 	}
 	if n.left != nil {
 		bs.Write(byte(CONTROL_BIT_LEFT), 2)
@@ -375,7 +395,7 @@ func (n *Node) WriteBytes(bs *BitStringWriter) {
 }
 ```
 
-## How do you Know When You're Done Reading the Content?
+## How do you Know When you're Done Reading the Content?
 
 I mentioned in the last section that we didn't need to encode that the tree was
 finished. That we would know when we were done because we had reached a leaf
@@ -392,7 +412,7 @@ offset is currently 0. That means the final byte will look like this.
 So, we're reading this in and the only information we've been given is the tree
 so far. How do we know if this next 0 is left, or just a 0.
 
-So you could theoretically use one of the ASCII control characters like `NUL` or
+So we could theoretically use one of the ASCII control characters like `NUL` or
 `EOT` to indicate that the content has ended. But what if the file actually had
 one of those characters in it for some reason. Then we might prematurely exit
 our algorithm.
@@ -424,9 +444,10 @@ The content in as many bits as it takes
 It was a fun project, with a lot of room to solve problems while coming up with
 the encoding.
 
-Let's compare our results to the video. When I looked up the lyrics to the song
-they were clearly different than the lyrics displayed in the video. I'll talk
-about how that might create discrepancies in a moment.
+Before we finish let's take a moment to compare our results to the video. When I
+looked up the lyrics to the song they were clearly different than the lyrics
+displayed in the video. I'll talk about how that might create discrepancies in a
+moment.
 
 ```
 Wild Wild West Lyrics:
@@ -443,14 +464,13 @@ Compared to the figures given in Tom Scott's video:
 As for the discrepancy, I have two guesses. Maybe the fact that my input is
 larger means that bytes with higher frequency (and therefore more efficient
 encodings) are repeated more often. Or maybe my tree encoding is more efficient
-than theirs.
+than theirs. I can't imagine the content encoding being any different.
+
+Let's verify that the output actually does match the input. So we'll run the
+Wild Wild West lyrics through the encode process, then decode that result and
+compute the hash of each the input and the final output.
 
 ```shell
-$ wc -c wild-wild-west.txt wild-wild-west-encoded.huff
-4334 wild-wild-west.txt
-2567 wild-wild-west-encoded.huff
-6901 total
-
 $ sha256sum wild-wild-west.txt wild-wild-west-decoded.txt
 52c6ac38d1a79ffafeda16a74d20fb59cc9a5fc099609a59654f449c6cc95017  wild-wild-west.txt
 52c6ac38d1a79ffafeda16a74d20fb59cc9a5fc099609a59654f449c6cc95017  wild-wild-west-decoded.txt
