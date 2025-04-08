@@ -2,7 +2,7 @@
 date: '2025-02-03T19:41:22-05:00'
 draft: true
 title: 'Pacdiff'
-type: "page"
+type: "project"
 showTableOfContents: true
 ---
 

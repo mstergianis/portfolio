@@ -5,7 +5,7 @@ description: "backing up [Vaultwarden](https://www.vaultwarden.ca/) into [pass](
 params:
     github: "https://github.com/mstergianis/vwp"
     thumbnail: "/images/vwp.png"
-type: 'page'
+type: "project"
 # showTableOfContents: true
 ---
 
